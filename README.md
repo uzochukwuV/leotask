@@ -109,6 +109,49 @@ BLOCK_INTERVAL=15000           # polling interval in ms
 - Minimum useful delay: 5 minutes (30 blocks) to allow proof time
 - The frontend adds a 20-block buffer automatically
 
+## Roadmap
+
+### ✅ v1 — Scheduled ALEO Transfer (current)
+- Single ALEO transfer scheduled at a future block
+- On-chain escrow via public credits mapping
+- Keeper bot auto-execution
+- Frontend with Shield + Leo wallet support
+- Cancel & refund before execution
+
+### 🔜 v2 — Multi-Token Support
+- Schedule transfers for any ARC-20 / token-registry token (USDC, USDT, wBTC, etc.)
+- Token balance display and approval flow in frontend
+- Keeper supports multi-token task execution
+
+### 🔜 v3 — Recurring Payments
+- Set a payment cadence (daily, weekly, monthly) and a number of occurrences
+- Keeper re-schedules the next execution automatically after each one
+- Use case: subscriptions, salaries, vesting schedules, DAO contributor payments
+
+### 🔜 v4 — Recurring Swaps (DCA)
+- Dollar-cost averaging: swap a fixed token amount on a recurring schedule
+- Integrates with Aleo DEX protocols
+- User sets token pair, amount per interval, total duration
+- Use case: automated BTC/ETH accumulation strategy
+
+### 🔜 v5 — Price-Triggered Swaps
+- Execute a swap when a token reaches a target price (limit order style)
+- Oracle integration for on-chain price feeds
+- Supports take-profit, stop-loss, and entry orders
+- Use case: automated trading without keeping browser open
+
+### 🔜 v6 — Price-Triggered Transfers
+- Send tokens to a recipient when a price condition is met
+- Combine with recurring logic for conditional payments
+- Use case: pay a contractor when asset price is above threshold
+
+### 🔜 v7 — Multi-Step Automation (Workflows)
+- Chain multiple actions: swap → transfer → re-invest
+- Conditional branching based on on-chain state
+- Use case: yield rebalancing, auto-compounding, portfolio management
+
+---
+
 ## Requirements
 
 - [snarkOS](https://github.com/AleoHQ/snarkOS) installed
