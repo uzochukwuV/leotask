@@ -5,7 +5,7 @@
 outputs/
 
 */outputs/
-*.json
+
 *.log
 *.tsbuildinfo
 node_modules/
