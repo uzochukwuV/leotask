@@ -1,160 +1,447 @@
-# Leotask
+# Leotask - Advanced Scheduled Transfer System
 
-**Scheduled transfer automation on Aleo.** Users escrow ALEO into an on-chain program; a keeper bot monitors the blockchain and executes the transfer automatically when the trigger block is reached. Cancel anytime before execution for a full refund.
+A comprehensive automation platform for Aleo blockchain with support for recurring payments, conditional transfers, multi-party escrow, and USDCx token support.
 
-## How It Works
+## Features
 
-```
-User                   On-Chain Program           Keeper Bot
- │                           │                        │
- ├─ create_scheduled_transfer ──────────────────────►  │
- │  (escrows ALEO, sets trigger block)                  │
- │                           │                        │
- │                           │  ◄── polls block ──── │
- │                           │      height every 15s  │
- │                           │                        │
- │           trigger block reached                    │
- │                           │  ◄── execute_scheduled_transfer ─┤
- │                           │      (reads task, pays recipient) │
- │                           │                        │
- ▼                    recipient receives ALEO          │
-```
+### 🔄 Recurring Payments
+- Execute transfers multiple times at regular intervals
+- Automatic rescheduling after each execution
+- Cancel remaining executions at any time
 
-## Repository Structure
+### ⚡ Conditional Transfers
+- Execute only when specific conditions are met
+- Price-based triggers (above/below threshold)
+- Time-based triggers (block height)
+- Cancel if conditions are never met
 
-```
-leotask/
-├── src/
-│   └── main.leo              # Leo smart contract
-├── keeper-bot/
-│   ├── keeper-bot.mjs        # Keeper bot (Node.js)
-│   ├── create_transfer_test.mjs  # CLI test script
-│   └── .env                  # Bot config (private key, endpoints)
-├── frontend/
-│   └── src/                  # React + Vite UI
-└── program.json              # Leo program manifest
-```
+### 👥 Multi-Party Escrow
+- Require approval from multiple parties before execution
+- Configurable approval thresholds (up to 10 parties)
+- Prevent single-party fraud
+- Cancel before approval if needed
 
-## Smart Contract
+### 💰 USDCx Support
+- Support for USDCx (Superfluid wrapper of USDC) tokens
+- Configurable token program addresses
+- Admin-controlled token management
 
-Program: `automation_scheduled_transferv3.aleo`
+### 🤖 Clean Keeper Bot Architecture
+- Automatic task execution when conditions are met
+- Support for all task types
+- HTTP API for task management
+- Process manager with auto-restart
 
-| Transition | Description |
-|---|---|
-| `create_scheduled_transfer` | Escrow ALEO, register task on-chain |
-| `execute_scheduled_transfer` | Pay recipient (callable by anyone at trigger block) |
-| `cancel_scheduled_transfer` | Refund escrowed ALEO to creator |
+### 🧪 Extensive Test Suite
+- Comprehensive feature tests
+- Edge case and boundary condition tests
+- Stress testing with concurrent tasks
+- HTML and text report generation
 
-**Fund flow:** User public credits → program public balance → recipient
+## Architecture
+
+### Smart Contract (`src/main.leo`)
+
+The Leo smart contract implements:
+
+- **Task Management:** Create, execute, and cancel tasks
+- **Escrow System:** Secure fund escrow with role-based access
+- **Multi-Party Logic:** Approval tracking and verification
+- **Token Support:** Multiple token types (ALEO, USDCx)
+
+### Keeper Bot (`keeper-bot/`)
+
+The keeper bot provides:
+
+- **Task Execution:** Automatic execution when conditions are met
+- **HTTP API:** RESTful API for task management
+- **Process Management:** Auto-restart and health monitoring
+- **Price Oracle:** Integration with price feeds for conditional transfers
+
+### Test Suite (`keeper-bot/test_*.mjs`)
+
+Comprehensive testing:
+
+- **Feature Tests:** All new features
+- **Edge Case Tests:** Error handling and boundary conditions
+- **Stress Tests:** Concurrent task registration
+- **Report Generation:** HTML and text reports
 
 ## Quick Start
 
-### 1. Keeper Bot
+### Prerequisites
 
-```bash
-cd keeper-bot
-cp .env.example .env   # set PRIVATE_KEY
-npm install
-node keeper-bot.mjs
+1. **Leo Compiler** (v3.5.0+)
+   ```bash
+   leo --version
+   ```
+
+2. **snarkOS**
+   ```bash
+   snarkos --version
+   ```
+
+3. **Node.js** (v18+)
+   ```bash
+   node --version
+   ```
+
+4. **Aleo Testnet Account** with funds
+
+### Installation
+
+1. **Clone Repository:**
+   ```bash
+   git clone <repository-url>
+   cd leotask
+   ```
+
+2. **Install Dependencies:**
+   ```bash
+   cd keeper-bot
+   npm install
+   ```
+
+3. **Configure Environment:**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your configuration
+   ```
+
+4. **Compile Smart Contract:**
+   ```bash
+   cd src
+   leo build
+   ```
+
+5. **Deploy Smart Contract:**
+   ```bash
+   leo deploy --network testnet
+   ```
+
+6. **Start Keeper Bot:**
+   ```bash
+   cd keeper-bot
+   npm start
+   ```
+
+## Usage
+
+### One-Time Transfer
+
+```javascript
+const response = await fetch('http://localhost:3001/api/tasks/register', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    taskId: '0x1234567890abcdef',
+    recipient: 'aleo1recipientaddress',
+    amount: 1000000,  // 1 ALEO in microcredits
+    triggerBlock: '1000',
+    tokenType: 0,  // 0=ALEO, 1=USDCx
+  }),
+});
 ```
 
-Bot runs at `http://localhost:3001`.
+### Recurring Transfer
 
-### 2. Frontend
-
-```bash
-cd frontend
-npm install
-npm run dev            # http://localhost:5173
+```javascript
+const response = await fetch('http://localhost:3001/api/tasks/register-recurring', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    taskId: '0x1234567890abcdef',
+    recipient: 'aleo1recipientaddress',
+    amountPerExecution: 1000000,  // 1 ALEO per execution
+    firstTriggerBlock: '1000',
+    intervalBlocks: 100,  // Execute every 100 blocks
+    maxExecutions: 10,    // Execute 10 times
+    tokenType: 0,
+  }),
+});
 ```
 
-Requires Node.js 20+.
+### Conditional Transfer
 
-### 3. Test via CLI
-
-```bash
-cd keeper-bot
-node create_transfer_test.mjs
+```javascript
+const response = await fetch('http://localhost:3001/api/tasks/register-conditional', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    taskId: '0x1234567890abcdef',
+    recipient: 'aleo1recipientaddress',
+    amount: 1000000,
+    triggerBlock: '1000',
+    conditionType: 1,  // 1=price_above, 2=price_below
+    conditionValue: 50000,  // Price threshold
+    tokenType: 0,
+  }),
+});
 ```
 
-Creates a scheduled transfer and registers it with the running bot.
+### Multi-Party Escrow
 
-## Keeper Bot API
+```javascript
+// Create escrow
+const createResponse = await fetch('http://localhost:3001/api/tasks/register-escrow', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    taskId: '0x1234567890abcdef',
+    recipient: 'aleo1recipientaddress',
+    amount: 10000000,  // 10 ALEO
+    triggerBlock: '1000',
+    requiredApprovals: 3,  // Need 3 approvals
+    tokenType: 0,
+  }),
+});
+
+// Approve escrow
+const approveResponse = await fetch('http://localhost:3001/api/tasks/0x1234567890abcdef/approve', {
+  method: 'POST',
+});
+```
+
+## API Reference
+
+### Task Registration
 
 | Endpoint | Method | Description |
-|---|---|---|
-| `/health` | GET | Bot status, current block, pending task count |
-| `/api/tasks` | GET | All pending tasks with block progress |
-| `/api/tasks/register` | POST | Register a task (called automatically by test script / frontend) |
+|----------|--------|-------------|
+| `/api/tasks/register` | POST | Register one-time transfer |
+| `/api/tasks/register-recurring` | POST | Register recurring transfer |
+| `/api/tasks/register-conditional` | POST | Register conditional transfer |
+| `/api/tasks/register-escrow` | POST | Register multi-party escrow |
+
+### Task Management
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/tasks` | GET | Get all tasks |
+| `/api/tasks/:taskId` | GET | Get single task |
+| `/api/tasks/type/:type` | GET | Get tasks by type (0-3) |
+| `/api/tasks/:taskId/approve` | POST | Approve escrow |
+
+### System
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Bot health status |
+
+## Testing
+
+### Run All Tests
+
+```bash
+cd keeper-bot
+node run_all_tests.mjs
+```
+
+### Run Quick Tests
+
+```bash
+node run_all_tests.mjs --quick
+```
+
+### Generate HTML Report
+
+```bash
+node run_all_tests.mjs --report
+```
+
+### Run Specific Test Suites
+
+```bash
+# Feature tests
+node test_all_features.mjs
+
+# Edge case tests
+node test_edge_cases.mjs
+
+# Specific feature tests
+node test_all_features.mjs --one-time
+node test_all_features.mjs --recurring
+node test_all_features.mjs --conditional
+node test_all_features.mjs --escrow
+node test_all_features.mjs --usdcx
+node test_all_features.mjs --stress
+```
 
 ## Configuration
 
-Edit `keeper-bot/.env`:
+### Environment Variables
+
+Create a `.env` file in the `keeper-bot/` directory:
 
 ```env
-PRIVATE_KEY=APrivateKey1...   # Keeper wallet private key
-PROGRAM_ID=automation_scheduled_transferv3.aleo
-NETWORK_ID=1                  # 1 = testnet
+# Required
+PRIVATE_KEY=your_private_key_here
+
+# Optional
+PROGRAM_ID=automation_advanced_transferv4.aleo
+NETWORK=testnet
+NETWORK_ID=1
 API_ENDPOINT=https://api.explorer.provable.com/v1/testnet
 QUERY_ENDPOINT=https://api.explorer.provable.com/v1
 BROADCAST_ENDPOINT=https://api.explorer.provable.com/v1/testnet/transaction/broadcast
-SNARKOS_PATH=snarkos           # path to snarkos binary
-BLOCK_INTERVAL=15000           # polling interval in ms
+BLOCK_INTERVAL=15000
+API_PORT=3001
+FRONTEND_ORIGIN=*
+PRICE_ORACLE_URL=
 ```
 
-## Timing Notes
+## Task Types
 
-- Aleo testnet: ~10 seconds per block
-- ZK proof generation: 30–120 seconds (~3–12 blocks)
-- Minimum useful delay: 5 minutes (30 blocks) to allow proof time
-- The frontend adds a 20-block buffer automatically
+### 0 - One-Time Transfer
+Execute once when trigger block is reached.
 
-## Roadmap
+### 1 - Recurring Transfer
+Execute at intervals, reschedule after each execution.
 
-### ✅ v1 — Scheduled ALEO Transfer (current)
-- Single ALEO transfer scheduled at a future block
-- On-chain escrow via public credits mapping
-- Keeper bot auto-execution
-- Frontend with Shield + Leo wallet support
-- Cancel & refund before execution
+### 2 - Conditional Transfer
+Execute when both block height and price conditions are met.
 
-### 🔜 v2 — Multi-Token Support
-- Schedule transfers for any ARC-20 / token-registry token (USDC, USDT, wBTC, etc.)
-- Token balance display and approval flow in frontend
-- Keeper supports multi-token task execution
+### 3 - Multi-Party Escrow
+Execute when block height is reached and all approvals are received.
 
-### 🔜 v3 — Recurring Payments
-- Set a payment cadence (daily, weekly, monthly) and a number of occurrences
-- Keeper re-schedules the next execution automatically after each one
-- Use case: subscriptions, salaries, vesting schedules, DAO contributor payments
+## Token Types
 
-### 🔜 v4 — Recurring Swaps (DCA)
-- Dollar-cost averaging: swap a fixed token amount on a recurring schedule
-- Integrates with Aleo DEX protocols
-- User sets token pair, amount per interval, total duration
-- Use case: automated BTC/ETH accumulation strategy
+### 0 - ALEO
+Native Aleo token.
 
-### 🔜 v5 — Price-Triggered Swaps
-- Execute a swap when a token reaches a target price (limit order style)
-- Oracle integration for on-chain price feeds
-- Supports take-profit, stop-loss, and entry orders
-- Use case: automated trading without keeping browser open
+### 1 - USDCx
+Superfluid wrapper of USDC token.
 
-### 🔜 v6 — Price-Triggered Transfers
-- Send tokens to a recipient when a price condition is met
-- Combine with recurring logic for conditional payments
-- Use case: pay a contractor when asset price is above threshold
+## Security
 
-### 🔜 v7 — Multi-Step Automation (Workflows)
-- Chain multiple actions: swap → transfer → re-invest
-- Conditional branching based on on-chain state
-- Use case: yield rebalancing, auto-compounding, portfolio management
+### Escrow Safety
+- Funds are escrowed in the program's public balance
+- Only the creator can cancel before approval
+- Multi-party approval prevents single-party fraud
 
----
+### Conditional Transfer Safety
+- Price conditions are verified on-chain
+- Keeper cannot execute if conditions are not met
+- User can cancel if conditions are never met
 
-## Requirements
+### Recurring Payment Safety
+- Total amount is escrowed upfront
+- User can cancel remaining executions
+- Keeper reschedules automatically
 
-- [snarkOS](https://github.com/AleoHQ/snarkOS) installed
-- Node.js 20+ (frontend), Node.js 18+ (keeper bot)
-- Public ALEO credits on testnet
-- Shield or Leo wallet browser extension (for frontend)
+### Role-Based Access Control
+- Admin role can update token programs and keeper address
+- Keeper role can execute tasks
+- Users can cancel their own tasks
+
+## Architecture Details
+
+### Smart Contract
+
+The Leo smart contract implements:
+
+1. **Task Management**
+   - Create tasks with various types
+   - Execute tasks when conditions are met
+   - Cancel tasks before execution
+
+2. **Escrow System**
+   - Secure fund escrow
+   - Role-based access control
+   - Multi-party approval tracking
+
+3. **Token Support**
+   - Multiple token types
+   - Configurable token programs
+   - Admin-controlled updates
+
+### Keeper Bot
+
+The keeper bot provides:
+
+1. **Task Execution**
+   - Automatic execution when conditions are met
+   - Support for all task types
+   - Price oracle integration
+
+2. **HTTP API**
+   - RESTful API for task management
+   - Health monitoring
+   - Task querying
+
+3. **Process Management**
+   - Auto-restart on crash
+   - Health monitoring
+   - Log management
+
+### Test Suite
+
+Comprehensive testing:
+
+1. **Feature Tests**
+   - All new features
+   - Integration tests
+   - Stress tests
+
+2. **Edge Case Tests**
+   - Error handling
+   - Boundary conditions
+   - Concurrent operations
+
+3. **Report Generation**
+   - HTML reports
+   - Text reports
+   - Detailed error logs
+
+## Future Enhancements
+
+### Advanced Conditions
+- Time-based conditions (execute after specific date)
+- Block range conditions (execute within block range)
+- Composite conditions (AND/OR logic)
+
+### Token Swaps
+- Swap tokens before transfer
+- DEX integration
+- Slippage protection
+
+### Yield Farming
+- Stake escrowed funds
+- Distribute yield to users
+- Auto-compound
+
+### Governance
+- DAO approval for large transfers
+- Voting mechanism
+- Proposal system
+
+### Analytics
+- Task execution history
+- Performance metrics
+- User statistics
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests for new features
+5. Run the test suite
+6. Submit a pull request
+
+## License
+
+MIT License - see LICENSE file for details
+
+## Support
+
+For questions or issues:
+- Open an issue on GitHub
+- Check the documentation in `plans/` directory
+- Review the test suite for usage examples
+
+## Acknowledgments
+
+- Aleo team for the Leo language and snarkOS
+- Superfluid protocol for USDCx support
+- Community for feedback and testing
