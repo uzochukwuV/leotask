@@ -8,7 +8,7 @@
 //   - USDCx token support via test_usdcx_stablecoin.aleo
 //
 // Architecture:
-//   - Task records stored in public mappings
+//   - Task info stored in public mappings (structs, not records)
 //   - Users receive Auth records for cancellation
 //   - Keeper executes when conditions are met
 //   - Only keeper can execute tasks
@@ -33,12 +33,9 @@ program usdcx_automation_hub.aleo {
     const CONDITION_PRICE_ABOVE: u8 = 1u8;
     const CONDITION_PRICE_BELOW: u8 = 2u8;
 
-    // ========== RECORDS ==========
+    // ========== STRUCTS (for mappings) ==========
 
-    // Task record - stores task information
-    record Task {
-        owner: address,
-        task_id: field,
+    struct TaskInfo {
         creator: address,
         recipient: address,
         amount: u128,
@@ -56,8 +53,19 @@ program usdcx_automation_hub.aleo {
         created_at: u32,
     }
 
+    struct TaskIdInput {
+        creator: address,
+        recipient: address,
+        amount: u128,
+        trigger_block: u32,
+        task_type: u8,
+        timestamp: u32,
+    }
+
+    // ========== RECORDS (for user auth) ==========
+
     // Auth record - held by user for cancellation
-    record TaskAuth {
+    record TransferAuth {
         owner: address,
         task_id: field,
         amount: u128,
@@ -65,7 +73,7 @@ program usdcx_automation_hub.aleo {
     }
 
     // Escrow auth - held by party for approval
-    record EscrowAuth {
+    record EscrowApprovalAuth {
         owner: address,
         task_id: field,
         party_address: address,
@@ -73,26 +81,11 @@ program usdcx_automation_hub.aleo {
         has_approved: bool,
     }
 
-    // ========== STRUCTS ==========
-
-    struct TaskInput {
-        creator: address,
-        recipient: address,
-        amount: u128,
-        trigger_block: u32,
-        task_type: u8,
-        interval_blocks: u32,
-        max_executions: u32,
-        condition_type: u8,
-        condition_value: u64,
-        required_approvals: u8,
-    }
-
     // ========== MAPPINGS ==========
 
     mapping orchestrator: bool => address;
     mapping keepers: address => bool;
-    mapping tasks: field => Task;
+    mapping tasks: field => TaskInfo;
     mapping task_counter: bool => u64;
     mapping escrow_approvals: field => bool;
     mapping escrow_parties: field => bool;
@@ -135,45 +128,20 @@ program usdcx_automation_hub.aleo {
         amount: u128,
         trigger_block: u32,
         timestamp: u32,
-    ) -> (Task, TaskAuth, Future) {
+    ) -> (TransferAuth, Future) {
         assert(amount > 0u128);
-        assert(trigger_block > block.height);
 
-        let task_id: field = BHP256::hash_to_field(TaskInput {
-            creator: self.caller,
+        let task_id: field = BHP256::hash_to_field(TaskIdInput {
+            creator: self.signer,
             recipient: recipient,
             amount: amount,
             trigger_block: trigger_block,
             task_type: TASK_TYPE_ONE_TIME,
-            interval_blocks: 0u32,
-            max_executions: 1u32,
-            condition_type: CONDITION_NONE,
-            condition_value: 0u64,
-            required_approvals: 0u8,
+            timestamp: timestamp,
         });
 
-        let task: Task = Task {
-            owner: self.caller,
-            task_id: task_id,
-            creator: self.caller,
-            recipient: recipient,
-            amount: amount,
-            trigger_block: trigger_block,
-            task_type: TASK_TYPE_ONE_TIME,
-            interval_blocks: 0u32,
-            max_executions: 1u32,
-            executions_completed: 0u32,
-            condition_type: CONDITION_NONE,
-            condition_value: 0u64,
-            required_approvals: 0u8,
-            approvals_received: 0u8,
-            is_approved: true,
-            is_active: true,
-            created_at: timestamp,
-        };
-
-        let auth: TaskAuth = TaskAuth {
-            owner: self.caller,
+        let auth: TransferAuth = TransferAuth {
+            owner: self.signer,
             task_id: task_id,
             amount: amount,
             task_type: TASK_TYPE_ONE_TIME,
@@ -185,9 +153,9 @@ program usdcx_automation_hub.aleo {
             amount
         );
 
-        return (task, auth, finalize_create_one_time(
+        return (auth, finalize_create_one_time(
             task_id,
-            self.caller,
+            self.signer,
             recipient,
             amount,
             trigger_block,
@@ -207,12 +175,12 @@ program usdcx_automation_hub.aleo {
     ) {
         escrow_future.await();
 
+        assert(trigger_block > block.height);
+
         let exists: bool = Mapping::contains(tasks, task_id);
         assert(!exists);
 
-        let task: Task = Task {
-            owner: creator,
-            task_id: task_id,
+        let task: TaskInfo = TaskInfo {
             creator: creator,
             recipient: recipient,
             amount: amount,
@@ -245,49 +213,24 @@ program usdcx_automation_hub.aleo {
         interval_blocks: u32,
         max_executions: u32,
         timestamp: u32,
-    ) -> (Task, TaskAuth, Future) {
+    ) -> (TransferAuth, Future) {
         assert(amount_per_execution > 0u128);
         assert(interval_blocks > 0u32);
         assert(max_executions > 0u32);
-        assert(first_trigger_block > block.height);
 
         let total_amount: u128 = amount_per_execution * (max_executions as u128);
 
-        let task_id: field = BHP256::hash_to_field(TaskInput {
-            creator: self.caller,
+        let task_id: field = BHP256::hash_to_field(TaskIdInput {
+            creator: self.signer,
             recipient: recipient,
             amount: amount_per_execution,
             trigger_block: first_trigger_block,
             task_type: TASK_TYPE_RECURRING,
-            interval_blocks: interval_blocks,
-            max_executions: max_executions,
-            condition_type: CONDITION_NONE,
-            condition_value: 0u64,
-            required_approvals: 0u8,
+            timestamp: timestamp,
         });
 
-        let task: Task = Task {
-            owner: self.caller,
-            task_id: task_id,
-            creator: self.caller,
-            recipient: recipient,
-            amount: amount_per_execution,
-            trigger_block: first_trigger_block,
-            task_type: TASK_TYPE_RECURRING,
-            interval_blocks: interval_blocks,
-            max_executions: max_executions,
-            executions_completed: 0u32,
-            condition_type: CONDITION_NONE,
-            condition_value: 0u64,
-            required_approvals: 0u8,
-            approvals_received: 0u8,
-            is_approved: true,
-            is_active: true,
-            created_at: timestamp,
-        };
-
-        let auth: TaskAuth = TaskAuth {
-            owner: self.caller,
+        let auth: TransferAuth = TransferAuth {
+            owner: self.signer,
             task_id: task_id,
             amount: total_amount,
             task_type: TASK_TYPE_RECURRING,
@@ -299,9 +242,9 @@ program usdcx_automation_hub.aleo {
             total_amount
         );
 
-        return (task, auth, finalize_create_recurring(
+        return (auth, finalize_create_recurring(
             task_id,
-            self.caller,
+            self.signer,
             recipient,
             amount_per_execution,
             first_trigger_block,
@@ -325,12 +268,12 @@ program usdcx_automation_hub.aleo {
     ) {
         escrow_future.await();
 
+        assert(first_trigger_block > block.height);
+
         let exists: bool = Mapping::contains(tasks, task_id);
         assert(!exists);
 
-        let task: Task = Task {
-            owner: creator,
-            task_id: task_id,
+        let task: TaskInfo = TaskInfo {
             creator: creator,
             recipient: recipient,
             amount: amount_per_execution,
@@ -363,47 +306,22 @@ program usdcx_automation_hub.aleo {
         condition_type: u8,
         condition_value: u64,
         timestamp: u32,
-    ) -> (Task, TaskAuth, Future) {
+    ) -> (TransferAuth, Future) {
         assert(amount > 0u128);
-        assert(trigger_block > block.height);
         assert(condition_type >= CONDITION_PRICE_ABOVE);
         assert(condition_type <= CONDITION_PRICE_BELOW);
 
-        let task_id: field = BHP256::hash_to_field(TaskInput {
-            creator: self.caller,
+        let task_id: field = BHP256::hash_to_field(TaskIdInput {
+            creator: self.signer,
             recipient: recipient,
             amount: amount,
             trigger_block: trigger_block,
             task_type: TASK_TYPE_CONDITIONAL,
-            interval_blocks: 0u32,
-            max_executions: 1u32,
-            condition_type: condition_type,
-            condition_value: condition_value,
-            required_approvals: 0u8,
+            timestamp: timestamp,
         });
 
-        let task: Task = Task {
-            owner: self.caller,
-            task_id: task_id,
-            creator: self.caller,
-            recipient: recipient,
-            amount: amount,
-            trigger_block: trigger_block,
-            task_type: TASK_TYPE_CONDITIONAL,
-            interval_blocks: 0u32,
-            max_executions: 1u32,
-            executions_completed: 0u32,
-            condition_type: condition_type,
-            condition_value: condition_value,
-            required_approvals: 0u8,
-            approvals_received: 0u8,
-            is_approved: true,
-            is_active: true,
-            created_at: timestamp,
-        };
-
-        let auth: TaskAuth = TaskAuth {
-            owner: self.caller,
+        let auth: TransferAuth = TransferAuth {
+            owner: self.signer,
             task_id: task_id,
             amount: amount,
             task_type: TASK_TYPE_CONDITIONAL,
@@ -415,9 +333,9 @@ program usdcx_automation_hub.aleo {
             amount
         );
 
-        return (task, auth, finalize_create_conditional(
+        return (auth, finalize_create_conditional(
             task_id,
-            self.caller,
+            self.signer,
             recipient,
             amount,
             trigger_block,
@@ -441,12 +359,12 @@ program usdcx_automation_hub.aleo {
     ) {
         escrow_future.await();
 
+        assert(trigger_block > block.height);
+
         let exists: bool = Mapping::contains(tasks, task_id);
         assert(!exists);
 
-        let task: Task = Task {
-            owner: creator,
-            task_id: task_id,
+        let task: TaskInfo = TaskInfo {
             creator: creator,
             recipient: recipient,
             amount: amount,
@@ -478,49 +396,24 @@ program usdcx_automation_hub.aleo {
         trigger_block: u32,
         required_approvals: u8,
         timestamp: u32,
-    ) -> (Task, EscrowAuth, Future) {
+    ) -> (EscrowApprovalAuth, Future) {
         assert(amount > 0u128);
-        assert(trigger_block > block.height);
         assert(required_approvals > 0u8);
         assert(required_approvals <= 10u8);
 
-        let task_id: field = BHP256::hash_to_field(TaskInput {
-            creator: self.caller,
+        let task_id: field = BHP256::hash_to_field(TaskIdInput {
+            creator: self.signer,
             recipient: recipient,
             amount: amount,
             trigger_block: trigger_block,
             task_type: TASK_TYPE_ESCROW,
-            interval_blocks: 0u32,
-            max_executions: 1u32,
-            condition_type: CONDITION_NONE,
-            condition_value: 0u64,
-            required_approvals: required_approvals,
+            timestamp: timestamp,
         });
 
-        let task: Task = Task {
-            owner: self.caller,
+        let auth: EscrowApprovalAuth = EscrowApprovalAuth {
+            owner: self.signer,
             task_id: task_id,
-            creator: self.caller,
-            recipient: recipient,
-            amount: amount,
-            trigger_block: trigger_block,
-            task_type: TASK_TYPE_ESCROW,
-            interval_blocks: 0u32,
-            max_executions: 1u32,
-            executions_completed: 0u32,
-            condition_type: CONDITION_NONE,
-            condition_value: 0u64,
-            required_approvals: required_approvals,
-            approvals_received: 0u8,
-            is_approved: false,
-            is_active: true,
-            created_at: timestamp,
-        };
-
-        let auth: EscrowAuth = EscrowAuth {
-            owner: self.caller,
-            task_id: task_id,
-            party_address: self.caller,
+            party_address: self.signer,
             amount: amount,
             has_approved: false,
         };
@@ -531,9 +424,9 @@ program usdcx_automation_hub.aleo {
             amount
         );
 
-        return (task, auth, finalize_create_escrow(
+        return (auth, finalize_create_escrow(
             task_id,
-            self.caller,
+            self.signer,
             recipient,
             amount,
             trigger_block,
@@ -555,12 +448,12 @@ program usdcx_automation_hub.aleo {
     ) {
         escrow_future.await();
 
+        assert(trigger_block > block.height);
+
         let exists: bool = Mapping::contains(tasks, task_id);
         assert(!exists);
 
-        let task: Task = Task {
-            owner: creator,
-            task_id: task_id,
+        let task: TaskInfo = TaskInfo {
             creator: creator,
             recipient: recipient,
             amount: amount,
@@ -594,17 +487,18 @@ program usdcx_automation_hub.aleo {
         task_id: field,
         party_address: address,
     ) -> Future {
-        let task: Task = Mapping::get(tasks, task_id);
-        assert_eq(task.creator, self.caller);
-        assert_eq(task.task_type, TASK_TYPE_ESCROW);
-
-        return finalize_add_party(task_id, party_address);
+        return finalize_add_party(self.caller, task_id, party_address);
     }
 
     async function finalize_add_party(
+        caller: address,
         task_id: field,
         party_address: address,
     ) {
+        let task: TaskInfo = Mapping::get(tasks, task_id);
+        assert_eq(task.creator, caller);
+        assert_eq(task.task_type, TASK_TYPE_ESCROW);
+
         let party_field: field = party_address as field;
         let key: field = task_id + party_field;
         Mapping::set(escrow_parties, key, true);
@@ -613,8 +507,8 @@ program usdcx_automation_hub.aleo {
     // Approve escrow
     async transition approve_escrow(
         task_id: field,
-        auth: EscrowAuth,
-    ) -> (EscrowAuth, Future) {
+        auth: EscrowApprovalAuth,
+    ) -> (EscrowApprovalAuth, Future) {
         assert_eq(auth.owner, self.caller);
         assert_eq(auth.task_id, task_id);
 
@@ -625,7 +519,7 @@ program usdcx_automation_hub.aleo {
         task_id: field,
         caller: address,
     ) {
-        let task: Task = Mapping::get(tasks, task_id);
+        let task: TaskInfo = Mapping::get(tasks, task_id);
         assert_eq(task.task_type, TASK_TYPE_ESCROW);
         assert(!task.is_approved);
 
@@ -642,9 +536,7 @@ program usdcx_automation_hub.aleo {
         let new_count: u8 = task.approvals_received + 1u8;
         let fully_approved: bool = new_count >= task.required_approvals;
 
-        let updated_task: Task = Task {
-            owner: task.owner,
-            task_id: task.task_id,
+        let updated_task: TaskInfo = TaskInfo {
             creator: task.creator,
             recipient: task.recipient,
             amount: task.amount,
@@ -671,7 +563,14 @@ program usdcx_automation_hub.aleo {
         task_id: field,
         current_price: u64,
     ) -> Future {
-        let task: Task = Mapping::get(tasks, task_id);
+        return finalize_execute(task_id, current_price);
+    }
+
+    async function finalize_execute(
+        task_id: field,
+        current_price: u64,
+    ) {
+        let task: TaskInfo = Mapping::get(tasks, task_id);
         assert(task.is_active);
         assert(block.height >= task.trigger_block);
 
@@ -692,36 +591,16 @@ program usdcx_automation_hub.aleo {
             task.amount
         );
 
-        return finalize_execute(
-            task_id,
-            task.task_type,
-            task.interval_blocks,
-            task.max_executions,
-            task.executions_completed,
-            transfer_future,
-        );
-    }
-
-    async function finalize_execute(
-        task_id: field,
-        task_type: u8,
-        interval_blocks: u32,
-        max_executions: u32,
-        executions_completed: u32,
-        transfer_future: Future,
-    ) {
         transfer_future.await();
 
-        if (task_type == TASK_TYPE_RECURRING) {
-            let new_executions: u32 = executions_completed + 1u32;
+        // Handle recurring tasks
+        if (task.task_type == TASK_TYPE_RECURRING) {
+            let new_executions: u32 = task.executions_completed + 1u32;
 
-            if (new_executions < max_executions) {
-                let task: Task = Mapping::get(tasks, task_id);
-                let next_trigger: u32 = task.trigger_block + interval_blocks;
+            if (new_executions < task.max_executions) {
+                let next_trigger: u32 = task.trigger_block + task.interval_blocks;
 
-                let updated_task: Task = Task {
-                    owner: task.owner,
-                    task_id: task.task_id,
+                let updated_task: TaskInfo = TaskInfo {
                     creator: task.creator,
                     recipient: task.recipient,
                     amount: task.amount,
@@ -751,11 +630,19 @@ program usdcx_automation_hub.aleo {
     // ========== CANCELLATION ==========
 
     async transition cancel_transfer(
-        auth: TaskAuth,
+        auth: TransferAuth,
     ) -> Future {
         assert_eq(auth.owner, self.caller);
 
-        let task: Task = Mapping::get(tasks, auth.task_id);
+        return finalize_cancel(auth.task_id, auth.amount, auth.task_type);
+    }
+
+    async function finalize_cancel(
+        task_id: field,
+        auth_amount: u128,
+        auth_task_type: u8,
+    ) {
+        let task: TaskInfo = Mapping::get(tasks, task_id);
         assert_eq(task.creator, self.caller);
         assert(task.is_active);
 
@@ -770,32 +657,33 @@ program usdcx_automation_hub.aleo {
             refund
         );
 
-        return finalize_cancel(auth.task_id, refund_future);
-    }
-
-    async function finalize_cancel(
-        task_id: field,
-        refund_future: Future,
-    ) {
         refund_future.await();
         Mapping::remove(tasks, task_id);
     }
 
     // Cancel escrow (only if not yet approved)
     async transition cancel_escrow(
-        auth: EscrowAuth,
+        auth: EscrowApprovalAuth,
     ) -> Future {
         assert_eq(auth.owner, self.caller);
 
-        let task: Task = Mapping::get(tasks, auth.task_id);
+        return finalize_cancel_escrow(auth.task_id, auth.amount);
+    }
+
+    async function finalize_cancel_escrow(
+        task_id: field,
+        auth_amount: u128,
+    ) {
+        let task: TaskInfo = Mapping::get(tasks, task_id);
         assert_eq(task.creator, self.caller);
         assert(!task.is_approved);
 
         let refund_future: Future = test_usdcx_stablecoin.aleo/transfer_public(
             self.caller,
-            auth.amount
+            auth_amount
         );
 
-        return finalize_cancel(auth.task_id, refund_future);
+        refund_future.await();
+        Mapping::remove(tasks, task_id);
     }
 }
