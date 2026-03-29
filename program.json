@@ -1,9 +1,9 @@
 {
-  "program": "automation_advanced_transferv5.aleo",
+  "program": "automation_advanced_transfer_v5.aleo",
   "version": "0.1.0",
   "description": "Scheduled transfer automation on Aleo - supports native ALEO and USDCx",
   "license": "MIT",
-  "leo": "3.4.0",
+  "leo": "3.5.0",
   "dependencies": [
     {
       "name": "token_registry.aleo",
