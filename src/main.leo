@@ -79,8 +79,8 @@ program automation_advanced_transfer_v5.aleo {
     // ═══════════════════════════════════════════════════════════════
 
     @noupgrade
-    constructor() {
-        // Init logic removed as it's no longer supported in constructor in Leo 4.0
+    async transition() {
+        // Init logic removed as it's no longer supported in async transition in Leo 4.0
     }
 
     // ═══════════════════════════════════════════════════════════════
