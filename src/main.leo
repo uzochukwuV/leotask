@@ -135,7 +135,7 @@ program automation_advanced_transfer_v5.aleo {
     // ═══════════════════════════════════════════════════════════════
 
     @custom
-    async constructor() {
+    constructor() {
         Mapping::set(roles, 0u8, self.program_owner);  // Admin
         Mapping::set(roles, 1u8, self.program_owner);  // Keeper/Orchestrator
         
@@ -151,7 +151,7 @@ program automation_advanced_transfer_v5.aleo {
     // User escrows tokens and registers the task publicly.
     // Returns a CancelAuth record so the user can cancel before execution.
     // Works with any token registered in token_registry (use 0field for native ALEO)
-    async transition create_scheduled_transfer(
+    fn create_scheduled_transfer(
         public task_id: field,
         public recipient: address,
         public amount: u64,
@@ -186,7 +186,7 @@ program automation_advanced_transfer_v5.aleo {
     }
 
     // Create scheduled transfer with USDCx (uses separate contract)
-    async transition create_scheduled_transfer_usdcx(
+    fn create_scheduled_transfer_usdcx(
         public task_id: field,
         public recipient: address,
         public amount: u64,
@@ -218,7 +218,7 @@ program automation_advanced_transfer_v5.aleo {
         ));
     }
 
-    async function finalize_create_scheduled(
+    fn finalize_create_scheduled(
         transfer_future: Future,
         task_id: field,
         creator: address,
@@ -227,7 +227,7 @@ program automation_advanced_transfer_v5.aleo {
         trigger_block: u32,
         token_id: field,
     ) {
-        transfer_future.await();
+        transfer_future;
 
         assert(trigger_block > block.height);
 
@@ -258,7 +258,7 @@ program automation_advanced_transfer_v5.aleo {
 
     // User creates a recurring transfer that executes multiple times
     // Works with any token registered in token_registry (use 0field for native ALEO)
-    async transition create_recurring_transfer(
+    fn create_recurring_transfer(
         public task_id: field,
         public recipient: address,
         public amount_per_execution: u64,
@@ -304,7 +304,7 @@ program automation_advanced_transfer_v5.aleo {
     }
 
     // User creates a recurring transfer with USDCx (uses separate contract)
-    async transition create_recurring_transfer_usdcx(
+    fn create_recurring_transfer_usdcx(
         public task_id: field,
         public recipient: address,
         public amount_per_execution: u64,
@@ -347,7 +347,7 @@ program automation_advanced_transfer_v5.aleo {
         ));
     }
 
-    async function finalize_create_recurring(
+    fn finalize_create_recurring(
         transfer_future: Future,
         task_id: field,
         creator: address,
@@ -358,7 +358,7 @@ program automation_advanced_transfer_v5.aleo {
         max_executions: u32,
         token_id: field,
     ) {
-        transfer_future.await();
+        transfer_future;
 
         assert(first_trigger_block > block.height);
 
@@ -389,7 +389,7 @@ program automation_advanced_transfer_v5.aleo {
 
     // User creates a conditional transfer that executes when conditions are met
     // Works with any token registered in token_registry (use 0field for native ALEO)
-    async transition create_conditional_transfer(
+    fn create_conditional_transfer(
         public task_id: field,
         public recipient: address,
         public amount: u64,
@@ -432,7 +432,7 @@ program automation_advanced_transfer_v5.aleo {
     }
 
     // User creates a conditional transfer with USDCx (uses separate contract)
-    async transition create_cond_transfer_usdcx(
+    fn create_cond_transfer_usdcx(
         public task_id: field,
         public recipient: address,
         public amount: u64,
@@ -472,7 +472,7 @@ program automation_advanced_transfer_v5.aleo {
         ));
     }
 
-    async function finalize_create_conditional(
+    fn finalize_create_conditional(
         transfer_future: Future,
         task_id: field,
         creator: address,
@@ -483,7 +483,7 @@ program automation_advanced_transfer_v5.aleo {
         condition_value: u64,
         token_id: field,
     ) {
-        transfer_future.await();
+        transfer_future;
 
         assert(trigger_block > block.height);
 
@@ -514,7 +514,7 @@ program automation_advanced_transfer_v5.aleo {
 
     // User creates a multi-party escrow that requires multiple approvals
     // Works with any token registered in token_registry (use 0field for native ALEO)
-    async transition create_multi_party_escrow(
+    fn create_multi_party_escrow(
         public task_id: field,
         public recipient: address,
         public amount: u64,
@@ -555,7 +555,7 @@ program automation_advanced_transfer_v5.aleo {
     }
 
     // User creates a multi-party escrow with USDCx (uses separate contract)
-    async transition create_multi_party_escrow_usdcx(
+    fn create_multi_party_escrow_usdcx(
         public task_id: field,
         public recipient: address,
         public amount: u64,
@@ -593,7 +593,7 @@ program automation_advanced_transfer_v5.aleo {
         ));
     }
 
-    async function finalize_create_escrow(
+    fn finalize_create_escrow(
         transfer_future: Future,
         task_id: field,
         creator: address,
@@ -603,7 +603,7 @@ program automation_advanced_transfer_v5.aleo {
         required_approvals: u8,
         token_id: field,
     ) {
-        transfer_future.await();
+        transfer_future;
 
         assert(trigger_block > block.height);
 
@@ -634,7 +634,7 @@ program automation_advanced_transfer_v5.aleo {
     }
 
     // Party approves the escrow - consumes old auth and returns updated one
-    async transition approve_escrow(
+    fn approve_escrow(
         public task_id: field,
         auth: EscrowAuth,
     ) -> (EscrowAuth, Future) {
@@ -655,7 +655,7 @@ program automation_advanced_transfer_v5.aleo {
         return (updated_auth, finalize_approve_escrow(task_id, self.caller));
     }
 
-    async function finalize_approve_escrow(
+    fn finalize_approve_escrow(
         task_id: field,
         caller: address,
     ) {
@@ -697,7 +697,7 @@ program automation_advanced_transfer_v5.aleo {
 
     // Add a party to the escrow - creator only
     // Note: Creator must provide their EscrowAuth to prove ownership
-    async transition add_escrow_party(
+    fn add_escrow_party(
         public task_id: field,
         public party_address: address,
         creator_auth: EscrowAuth,
@@ -720,7 +720,7 @@ program automation_advanced_transfer_v5.aleo {
         return (creator_auth, new_party_auth, finalize_add_party(task_id, self.caller, party_address));
     }
 
-    async function finalize_add_party(
+    fn finalize_add_party(
         task_id: field,
         caller: address,
         party_address: address,
@@ -741,7 +741,7 @@ program automation_advanced_transfer_v5.aleo {
 
     // Execute transfer using token_registry (for any token including native ALEO with 0field)
     // Anyone can execute once trigger_block is reached and conditions are met.
-    async transition execute_transfer(
+    fn execute_transfer(
         public task_id: field,
         public recipient: address,
         public amount: u64,
@@ -758,7 +758,7 @@ program automation_advanced_transfer_v5.aleo {
     }
 
     // Execute transfer for USDCx (uses separate contract)
-    async transition execute_transfer_usdcx(
+    fn execute_transfer_usdcx(
         public task_id: field,
         public recipient: address,
         public amount: u64,
@@ -772,7 +772,7 @@ program automation_advanced_transfer_v5.aleo {
         return finalize_execute(transfer_future, task_id, recipient, amount, current_price, USDCX_TOKEN_ID);
     }
 
-    async function finalize_execute(
+    fn finalize_execute(
         transfer_future: Future,
         task_id: field,
         recipient: address,
@@ -808,7 +808,7 @@ program automation_advanced_transfer_v5.aleo {
         }
 
         // Execute transfer
-        transfer_future.await();
+        transfer_future;
 
         // Handle recurring tasks
         if (info.task_type == 1u8) {
@@ -850,7 +850,7 @@ program automation_advanced_transfer_v5.aleo {
     // ═══════════════════════════════════════════════════════════════
 
     // Cancel one-time scheduled transfer (using token_registry for any token)
-    async transition cancel_scheduled_transfer(
+    fn cancel_scheduled_transfer(
         cancel: CancelAuth,
     ) -> Future {
         assert_eq(cancel.owner, self.caller);
@@ -866,7 +866,7 @@ program automation_advanced_transfer_v5.aleo {
     }
 
     // Cancel one-time scheduled transfer (USDCx)
-    async transition cancel_scheduled_transfer_usdcx(
+    fn cancel_scheduled_transfer_usdcx(
         cancel: CancelAuth,
     ) -> Future {
         assert_eq(cancel.owner, self.caller);
@@ -880,7 +880,7 @@ program automation_advanced_transfer_v5.aleo {
         return finalize_cancel_scheduled(transfer_future, cancel.task_id, self.caller, cancel.amount, USDCX_TOKEN_ID);
     }
 
-    async function finalize_cancel_scheduled(
+    fn finalize_cancel_scheduled(
         transfer_future: Future,
         task_id: field,
         caller: address,
@@ -892,13 +892,13 @@ program automation_advanced_transfer_v5.aleo {
         assert_eq(info.amount, amount);
         assert_eq(info.token_id, token_id);
         assert_eq(info.task_type, 0u8);  // Must be one-time
-        transfer_future.await();
+        transfer_future;
         Mapping::remove(task_data, task_id);
     }
 
     // Cancel recurring transfer (using token_registry for any token)
-    // Uses data from the record instead of reading mapping in transition
-    async transition cancel_recurring_transfer(
+    // Uses data from the record instead of reading mapping in fn
+    fn cancel_recurring_transfer(
         auth: RecurringAuth,
     ) -> Future {
         assert_eq(auth.owner, self.caller);
@@ -922,7 +922,7 @@ program automation_advanced_transfer_v5.aleo {
     }
 
     // Cancel recurring transfer (USDCx)
-    async transition cancel_recurring_transfer_usdcx(
+    fn cancel_recurring_transfer_usdcx(
         auth: RecurringAuth,
     ) -> Future {
         assert_eq(auth.owner, self.caller);
@@ -943,7 +943,7 @@ program automation_advanced_transfer_v5.aleo {
         );
     }
 
-    async function finalize_cancel_recurring(
+    fn finalize_cancel_recurring(
         transfer_future: Future,
         task_id: field,
         caller: address,
@@ -965,12 +965,12 @@ program automation_advanced_transfer_v5.aleo {
         // Verify the refund matches (total_amount in auth should equal remaining)
         // Note: This is validated by the fact that task hasn't progressed since auth was created
 
-        transfer_future.await();
+        transfer_future;
         Mapping::remove(task_data, task_id);
     }
 
     // Cancel conditional transfer (using token_registry for any token)
-    async transition cancel_conditional_transfer(
+    fn cancel_conditional_transfer(
         auth: ConditionalAuth,
     ) -> Future {
         assert_eq(auth.owner, self.caller);
@@ -986,7 +986,7 @@ program automation_advanced_transfer_v5.aleo {
     }
 
     // Cancel conditional transfer (USDCx)
-    async transition cancel_cond_transfer_usdcx(
+    fn cancel_cond_transfer_usdcx(
         auth: ConditionalAuth,
     ) -> Future {
         assert_eq(auth.owner, self.caller);
@@ -1000,7 +1000,7 @@ program automation_advanced_transfer_v5.aleo {
         return finalize_cancel_conditional(transfer_future, auth.task_id, self.caller, auth.amount, USDCX_TOKEN_ID);
     }
 
-    async function finalize_cancel_conditional(
+    fn finalize_cancel_conditional(
         transfer_future: Future,
         task_id: field,
         caller: address,
@@ -1012,13 +1012,13 @@ program automation_advanced_transfer_v5.aleo {
         assert_eq(info.amount, amount);
         assert_eq(info.token_id, token_id);
         assert_eq(info.task_type, 2u8);  // Must be conditional
-        transfer_future.await();
+        transfer_future;
         Mapping::remove(task_data, task_id);
     }
 
     // Cancel multi-party escrow (using token_registry for any token)
     // Only creator can cancel, and only if not yet fully approved
-    async transition cancel_escrow(
+    fn cancel_escrow(
         auth: EscrowAuth,
     ) -> Future {
         assert_eq(auth.owner, self.caller);
@@ -1035,7 +1035,7 @@ program automation_advanced_transfer_v5.aleo {
     }
 
     // Cancel multi-party escrow (USDCx)
-    async transition cancel_escrow_usdcx(
+    fn cancel_escrow_usdcx(
         auth: EscrowAuth,
     ) -> Future {
         assert_eq(auth.owner, self.caller);
@@ -1050,7 +1050,7 @@ program automation_advanced_transfer_v5.aleo {
         return finalize_cancel_escrow(transfer_future, auth.task_id, self.caller, auth.amount, USDCX_TOKEN_ID);
     }
 
-    async function finalize_cancel_escrow(
+    fn finalize_cancel_escrow(
         transfer_future: Future,
         task_id: field,
         caller: address,
@@ -1063,7 +1063,7 @@ program automation_advanced_transfer_v5.aleo {
         assert_eq(info.token_id, token_id);
         assert_eq(info.task_type, 3u8);  // Must be escrow
         assert(!info.is_approved);  // Can't cancel if already fully approved
-        transfer_future.await();
+        transfer_future;
         Mapping::remove(task_data, task_id);
     }
 
@@ -1073,13 +1073,13 @@ program automation_advanced_transfer_v5.aleo {
 
     // Update keeper address (admin only)
     // Admin check moved to finalize function
-    async transition update_keeper(
+    fn update_keeper(
         public new_keeper: address,
     ) -> Future {
         return finalize_update_keeper(self.caller, new_keeper);
     }
 
-    async function finalize_update_keeper(
+    fn finalize_update_keeper(
         caller: address,
         new_keeper: address,
     ) {
@@ -1091,13 +1091,13 @@ program automation_advanced_transfer_v5.aleo {
     }
 
     // Update admin address (current admin only)
-    async transition update_admin(
+    fn update_admin(
         public new_admin: address,
     ) -> Future {
         return finalize_update_admin(self.caller, new_admin);
     }
 
-    async function finalize_update_admin(
+    fn finalize_update_admin(
         caller: address,
         new_admin: address,
     ) {
