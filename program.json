@@ -6,7 +6,7 @@
   "leo": "4.0.0",
   "dependencies": [
     {
-      "name": "token_registry.aleo",
+      "name": "credits.aleo",
       "location": "network",
       "path": null,
       "edition": 1
