@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Layers, Repeat, ShieldAlert, Crosshair, ArrowRight } from 'lucide-react';
+import { Repeat, ShieldAlert, Crosshair, ArrowRight } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '@radix-ui/react-label';
+import { useWallet } from '@provablehq/aleo-wallet-adaptor-react';
+import { TransactionOptions } from '@provablehq/aleo-types';
 
 const TABS = [
   { id: 'scheduled', label: 'One-Time', icon: <ArrowRight size={16} /> },
@@ -13,11 +15,89 @@ const TABS = [
 ];
 
 export function TaskCreation() {
+  const { executeTransaction, connected } = useWallet();
   const [activeTab, setActiveTab] = useState('scheduled');
   const [tokenType, setTokenType] = useState<'ALEO' | 'USDCx'>('ALEO');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Form states
+  const [recipient, setRecipient] = useState('');
+  const [amount, setAmount] = useState('');
+  const [keeperFee, setKeeperFee] = useState('0.05');
+  const [triggerBlock, setTriggerBlock] = useState('');
+  const [expiryBlock, setExpiryBlock] = useState('');
+
+  // Recurring
+  const [intervalBlocks, setIntervalBlocks] = useState('');
+  const [maxExecutions, setMaxExecutions] = useState('');
+
+  // Conditional
+  const [targetPrice, setTargetPrice] = useState('');
+  const [oracleAddress, setOracleAddress] = useState('');
+
+  // Escrow
+  const [requiredApprovals, setRequiredApprovals] = useState('');
+  const [partyAddress, setPartyAddress] = useState('');
+
   const isUsdcx = tokenType === 'USDCx';
+
+  const handleInitializeTask = async () => {
+    if (!connected) {
+      alert('Please connect your wallet first');
+      return;
+    }
+    
+    setIsSubmitting(true);
+    try {
+      const taskId = Math.floor(Math.random() * 1000000000) + 'field';
+      const keeper = 'aleo1keeper00000000000000000000000000000000000000000000000000000'; // Default keeper address
+      
+      const amountMicro = Math.floor(parseFloat(amount) * 1000000) + 'u64';
+      const feeMicro = Math.floor(parseFloat(keeperFee) * 1000000) + 'u64';
+      
+      let programName = 'automation_advanced_transfer_v5.aleo';
+      let functionName = '';
+      let inputs: string[] = [];
+      const suffix = isUsdcx ? '_usdcx' : '';
+
+      if (activeTab === 'scheduled') {
+        programName = 'automation_advanced_transfer_v5.aleo';
+        functionName = 'create_sched_transfer' + suffix;
+        inputs = [taskId, keeper, recipient, amountMicro, feeMicro, triggerBlock + 'u32', expiryBlock + 'u32'];
+      } else if (activeTab === 'recurring') {
+        programName = 'advanced_pay.aleo';
+        functionName = 'create_recur_transfer' + suffix;
+        inputs = [taskId, keeper, recipient, amountMicro, feeMicro, triggerBlock + 'u32', intervalBlocks + 'u32', maxExecutions + 'u32', expiryBlock + 'u32'];
+      } else if (activeTab === 'conditional') {
+        programName = 'advanced_pay.aleo';
+        functionName = 'create_cond_transfer' + suffix;
+        // condition_type = 1 (e.g. price > target)
+        inputs = [taskId, keeper, recipient, amountMicro, feeMicro, triggerBlock + 'u32', '1u8', Math.floor(parseFloat(targetPrice) * 1000000) + 'u64', oracleAddress, expiryBlock + 'u32'];
+      } else if (activeTab === 'escrow') {
+        programName = 'advanced_pay.aleo';
+        functionName = 'create_escrow' + suffix;
+        inputs = [taskId, keeper, recipient, amountMicro, feeMicro, triggerBlock + 'u32', requiredApprovals + 'u8', partyAddress, expiryBlock + 'u32'];
+      }
+
+      const txOptions: TransactionOptions = {
+        program: programName,
+        function: functionName,
+        inputs: inputs,
+        fee: 50000,
+        privateFee: false,
+      };
+
+      console.log('Executing transaction:', txOptions);
+      const result = await executeTransaction(txOptions);
+      console.log('Transaction Result:', result);
+      alert('Task Initialized! TxID: ' + result?.transactionId);
+    } catch (error) {
+      console.error('Error executing transaction:', error);
+      alert('Failed to execute transaction. Check console.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="max-w-4xl mx-auto w-full flex flex-col items-center justify-center min-h-[80vh]">
@@ -76,17 +156,17 @@ export function TaskCreation() {
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-2 col-span-2">
                   <Label className="text-xs font-bold tracking-widest text-zinc-400">Recipient Address</Label>
-                  <Input placeholder="aleo1..." />
+                  <Input placeholder="aleo1..." value={recipient} onChange={e => setRecipient(e.target.value)} />
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label className="text-xs font-bold tracking-widest text-zinc-400">Amount ({tokenType})</Label>
-                  <Input type="number" placeholder="0.00" />
+                  <Input type="number" placeholder="0.00" value={amount} onChange={e => setAmount(e.target.value)} />
                 </div>
 
                 <div className="space-y-2">
                   <Label className="text-xs font-bold tracking-widest text-zinc-400">Keeper Fee</Label>
-                  <Input type="number" placeholder="0.00" defaultValue="0.05" />
+                  <Input type="number" placeholder="0.00" value={keeperFee} onChange={e => setKeeperFee(e.target.value)} />
                 </div>
               </div>
 
@@ -95,11 +175,11 @@ export function TaskCreation() {
                 <div className="grid grid-cols-2 gap-6 p-6 rounded-lg bg-white/5 border border-white/5">
                   <div className="space-y-2">
                     <Label className="text-xs font-bold tracking-widest text-zinc-400">Interval Blocks</Label>
-                    <Input type="number" placeholder="e.g. 5000" />
+                    <Input type="number" placeholder="e.g. 5000" value={intervalBlocks} onChange={e => setIntervalBlocks(e.target.value)} />
                   </div>
                   <div className="space-y-2">
                     <Label className="text-xs font-bold tracking-widest text-zinc-400">Max Executions</Label>
-                    <Input type="number" placeholder="12" />
+                    <Input type="number" placeholder="12" value={maxExecutions} onChange={e => setMaxExecutions(e.target.value)} />
                   </div>
                 </div>
               )}
@@ -108,11 +188,11 @@ export function TaskCreation() {
                 <div className="grid grid-cols-2 gap-6 p-6 rounded-lg bg-white/5 border border-white/5">
                   <div className="space-y-2">
                     <Label className="text-xs font-bold tracking-widest text-zinc-400">Target Price</Label>
-                    <Input type="number" placeholder="$100.00" />
+                    <Input type="number" placeholder="$100.00" value={targetPrice} onChange={e => setTargetPrice(e.target.value)} />
                   </div>
                   <div className="space-y-2">
                     <Label className="text-xs font-bold tracking-widest text-zinc-400">Oracle Address</Label>
-                    <Input placeholder="aleo1oracle..." />
+                    <Input placeholder="aleo1oracle..." value={oracleAddress} onChange={e => setOracleAddress(e.target.value)} />
                   </div>
                 </div>
               )}
@@ -121,11 +201,11 @@ export function TaskCreation() {
                 <div className="grid grid-cols-2 gap-6 p-6 rounded-lg bg-white/5 border border-white/5">
                   <div className="space-y-2">
                     <Label className="text-xs font-bold tracking-widest text-zinc-400">Required Approvals</Label>
-                    <Input type="number" placeholder="2" />
+                    <Input type="number" placeholder="2" value={requiredApprovals} onChange={e => setRequiredApprovals(e.target.value)} />
                   </div>
                   <div className="space-y-2">
                     <Label className="text-xs font-bold tracking-widest text-zinc-400">Party Address</Label>
-                    <Input placeholder="aleo1..." />
+                    <Input placeholder="aleo1..." value={partyAddress} onChange={e => setPartyAddress(e.target.value)} />
                   </div>
                 </div>
               )}
@@ -133,26 +213,29 @@ export function TaskCreation() {
               {/* Expiry Block */}
               <div className="pt-4 border-t border-white/5 space-y-2">
                 <Label className="text-xs font-bold tracking-widest text-zinc-400 flex justify-between">
-                  <span>Expiry Block (Escape Hatch)</span>
-                  <span className="text-zinc-600 font-mono">Current: 198420</span>
+                  <span>Trigger Block</span>
+                  <span className="text-zinc-600 font-mono">Current approx: 198420</span>
                 </Label>
-                <Input type="number" placeholder="e.g. 200000" />
+                <Input type="number" placeholder="e.g. 198500" value={triggerBlock} onChange={e => setTriggerBlock(e.target.value)} />
+              </div>
+              <div className="pt-4 space-y-2">
+                <Label className="text-xs font-bold tracking-widest text-zinc-400 flex justify-between">
+                  <span>Expiry Block (Escape Hatch)</span>
+                </Label>
+                <Input type="number" placeholder="e.g. 200000" value={expiryBlock} onChange={e => setExpiryBlock(e.target.value)} />
               </div>
 
             </motion.div>
           </AnimatePresence>
 
           <div className="mt-12 flex justify-end">
-            <Button 
-              size="lg" 
+            <Button
+              size="lg"
               className={`w-full md:w-auto font-mono uppercase tracking-widest ${isUsdcx ? 'bg-blue-500 hover:bg-blue-400 text-black' : 'bg-cyan-500 hover:bg-cyan-400 text-black'}`}
-              onClick={() => {
-                setIsSubmitting(true);
-                setTimeout(() => setIsSubmitting(false), 2000);
-              }}
-              disabled={isSubmitting}
+              onClick={handleInitializeTask}
+              disabled={isSubmitting || !connected}
             >
-              {isSubmitting ? 'GENERATING PROOF...' : 'INITIALIZE_TASK'}
+              {isSubmitting ? 'GENERATING PROOF...' : connected ? 'INITIALIZE_TASK' : 'CONNECT WALLET FIRST'}
             </Button>
           </div>
         </div>

@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Wallet, Activity, Code2, Layers } from 'lucide-react';
-import { Button } from '../ui/button';
+import { Activity, Code2, Layers } from 'lucide-react';
+import { WalletMultiButton } from '@provablehq/aleo-wallet-adaptor-react-ui';
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -30,11 +30,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <NavItem icon={<Code2 size={18} />} label="Automation" />
         </nav>
 
-        <div className="mt-auto pt-6 border-t border-white/10">
-          <Button variant="outline" className="w-full justify-start gap-2 font-mono text-xs">
-            <Wallet size={16} />
-            Connect Wallet
-          </Button>
+        <div className="mt-auto pt-6 border-t border-white/10 flex justify-center">
+          <WalletMultiButton className="w-full justify-center !bg-cyan-950 hover:!bg-cyan-900 border border-cyan-500/30 text-cyan-400 font-mono text-xs tracking-wider uppercase transition-all shadow-[0_0_15px_rgba(6,182,212,0.1)]" />
         </div>
       </motion.aside>
 

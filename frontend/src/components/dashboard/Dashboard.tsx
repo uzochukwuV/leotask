@@ -1,4 +1,3 @@
-import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ShieldCheck, Clock, Repeat, ArrowRightLeft, DollarSign } from 'lucide-react';
 import { Button } from '../ui/button';
@@ -150,7 +149,7 @@ function ReceiptCard({ receipt, delay }: any) {
 
 function ActivityIcon() {
   return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinelinejoin="round">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
     </svg>
   );
